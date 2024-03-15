@@ -1,0 +1,52 @@
+function codebook = codebook_generate(audio_file, num_mel_coeffs, ...
+                                      num_clusters, max_itr, epsilon)
+
+    window = hann(256, "periodic");
+    mfccs = get_mfccs(audio_file, num_mel_coeffs, 256, 85, window);
+    
+    % Assuming melcc contains cepstral coefficients
+    
+    % ------------------ BOILERPLATE LBG IMPLEMENTATION --------------------
+    
+    % Little has been modified / optimized here from online resources, has not
+    % been sufficiently tested (may need to be reimplemented).
+    
+    % Initialize codebook using random vectors from melcc
+    codebook = mfccs(randperm(size(mfccs, 1), num_clusters), :);
+
+    codebook = zeros(size(codebook));
+    codebook = 
+
+    %disp(mfccs);
+
+    % Initialize the codebook by taking the mean mfcc vector
+    
+    % for i = 1:num_clusters
+    % 
+    % end
+    
+    for iter = 1:max_itr
+        % Vector quantization step: Assign each vector to the nearest centroid
+        [~, assignments] = pdist2(codebook, mfccs, 'euclidean', 'Smallest', 1);
+        
+        % Update centroids
+        new_codebook = zeros(size(codebook));
+        for i = 1:num_clusters
+            cluster_indices = (assignments == i);
+            if any(cluster_indices)
+                new_codebook(i, :) = mean(mfccs(cluster_indices, :), 1);
+            else
+                % If no vectors were assigned to this centroid, keep it unchanged
+                new_codebook(i, :) = codebook(i, :);
+            end
+        end
+        
+        % Check for convergence
+        if max(vecnorm(new_codebook - codebook, 2, 2)) < epsilon
+            break;
+        end
+        
+        % Update codebook
+        codebook = new_codebook;
+    end
+end
