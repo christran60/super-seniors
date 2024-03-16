@@ -1,21 +1,19 @@
 % Parameters to adjust
-num_clusters = 32;
-num_mel_coeffs = 32;
-frame_size = 512;
-overlap_ratio = 0.2;
-overlap_size = round(frame_size * overlap_ratio);
-epsilon = 0.01;
-window = kaiser(frame_size, 0.5);
-
-% OPT with old alg
-% num_clusters = 30;
-% num_mel_coeffs = 30;
-% frame_size = 1024;
+% num_clusters = 32;
+% num_mel_coeffs = 32;
+% frame_size = 512;
 % overlap_ratio = 0.8;
-% overlap_size = round(frame_size * overlap_ratio);
-% epsilon = 0.0001;
+% epsilon = 0.000001;
 % window = kaiser(frame_size, 0.5);
 
+num_clusters = 20;
+num_mel_coeffs = 20;
+frame_size = 256;
+overlap_ratio = 0.4;
+epsilon = 0.01;
+window = hamming(frame_size);
+
+overlap_size = round(frame_size * overlap_ratio);
 
 % Input-related data: adjust based on what the input path is
 num_speakers = 19;
@@ -26,6 +24,8 @@ path_test = "StudentAudioRecording/Twelve-Testing/Twelve_test";
 
 % Training phase: Get the codebooks of all speakers
 list_of_codebooks = zeros(num_speakers, num_clusters, num_mel_coeffs-1);
+
+s_count = 1;
 for i = 1:num_speakers
     % Generate speaker file path
     file = path_train + i + ".wav";
@@ -63,39 +63,33 @@ for i = 1:num_speakers
     % centroids
     all_dists = zeros(1, num_speakers);
 
+    % This is rather inefficient, but for the sake of time we will not
+    % spend time optimizing it
     for s = 1:num_speakers
-
         % For every MFCC vector, find the nearest centroid belonging to
         % speaker s
         for j = 1:size(test_mfccs, 1)
             
             % Check the distance to all k centroids to find the smallest one
-            min_dist = 10^7;
+            min_dist = Inf;
 
             for k = 1:size(list_of_codebooks, 2)
-                
-                % Calculate the distance from jth MFCC to kth centroid
-                % dist = pdist2(test_mfccs(j, :), ...
-                %               list_of_codebooks(s, k, :), ...
-                %               'euclidean');
 
                 X = test_mfccs(j, :);
                 Y = squeeze(list_of_codebooks(s, k, :))';
-
                 dist = sqrt(sum((X-Y).^2));
-    
+
                 % If it is closer than previous, update minimum distance
                 if dist < min_dist
                     min_dist = dist;
                 end
-    
+
             end
-    
+
             % We now have the shortest distance that it takes to get from this
             % dart to the nearest centroid from speaker s - update the
             % record of the sum of all distances
             all_dists(s) = all_dists(s) + min_dist;
-    
         end
     end
 

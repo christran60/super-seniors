@@ -6,51 +6,45 @@ overlap_ratio = 0.8;
 epsilon = 0.000001;
 window = kaiser(frame_size, 0.5);
 
-% num_clusters = 20;
-% num_mel_coeffs = 20;
-% frame_size = 256;
-% overlap_ratio = 0.4;
-% epsilon = 0.01;
-% window = hamming(frame_size);
-
 overlap_size = round(frame_size * overlap_ratio);
 
 % Input-related data: adjust based on what the input path is
-num_speakers = 37;
-
-% For testing the Twelve data set (n=19)
-path_train = "StudentAudioRecording/Twelve-Training/Twelve_train";
-path_test = "StudentAudioRecording/Twelve-Testing/Twelve_test";
-
-% For testing the Zero dataset (n=19)
-% path_train = "StudentAudioRecording/Zero-Training/Zero_train";
-% path_test = "StudentAudioRecording/Zero-Testing/Zero_test";
-
-% For testing with the given test data (n=8)
+num_speakers = 19;
+% path_train = "StudentAudioRecording/Twelve-Training/Twelve_train";
+% path_test = "StudentAudioRecording/Twelve-Testing/Twelve_test";
+path_train = "StudentAudioRecording/Zero-Training/Zero_train";
+path_test = "StudentAudioRecording/Zero-Testing/Zero_test";
 % path_train = "GivenSpeech_Data/Training_Data/s";
 % path_test = "GivenSpeech_Data/Test_Data/s";
 
-% For Test 10: Aggregate of all test samples (n=37)
-% path_train = "AllTests/train/";
-% path_test = "AllTests/test/";
-
 % Training phase: Get the codebooks of all speakers
-list_of_codebooks = zeros(num_speakers, num_clusters, num_mel_coeffs-1);
+list_of_codebooks = zeros(num_speakers, num_clusters*2, num_mel_coeffs-1);
 
 invalid_files = 0;
 
 for i = 1:num_speakers
     % Generate speaker file path
-    file = path_train + i + ".wav";
-    if ~isfile(file)
+    file1 = "StudentAudioRecording/Twelve-Training/Twelve_train" + i + ".wav";
+    file2 = "StudentAudioRecording/Zero-Training/Zero_train" + i + ".wav";
+    if ~isfile(file1)
+        disp("Invalid filename!");
+        invalid_files = invalid_files + 1;
+        continue;
+    end
+    if ~isfile(file2)
         disp("Invalid filename!");
         invalid_files = invalid_files + 1;
         continue;
     end
 
     % Get the codebook for a particular speaker
-    codebook = codebook_generate(file, num_mel_coeffs, num_clusters, epsilon, ...
+    codebook1 = codebook_generate(file1, num_mel_coeffs, num_clusters, epsilon, ...
                                     frame_size, overlap_size, window);
+
+    codebook2 = codebook_generate(file1, num_mel_coeffs, num_clusters, epsilon, ...
+                                    frame_size, overlap_size, window);
+
+    codebook = combine_codebooks(codebook1, codebook2);
 
     % Store the codebook in our list of codebooks
     list_of_codebooks(i, :, :) = codebook;
@@ -124,3 +118,17 @@ percent = diag_count / (size(result_matrix, 1) - invalid_files) * 100;
 
 fprintf("Accuracy: %f (%i/%i)\n", percent, diag_count, ...
             size(result_matrix, 1) - invalid_files);
+
+function combined_codebook = combine_codebooks(codebook1, codebook2)
+    % Concatenate the two codebooks vertically
+    combined_codebook = [codebook1; codebook2];
+
+    % Get the maximum cluster index of the first codebook
+    max_index_codebook1 = max(codebook1(:, 1));
+
+    % Adjust the cluster indices of the second codebook
+    codebook2(:, 1) = codebook2(:, 1) + max_index_codebook1;
+
+    % Concatenate the adjusted second codebook to the first codebook
+    combined_codebook = [codebook1; codebook2];
+end
