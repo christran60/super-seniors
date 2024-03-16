@@ -1,38 +1,31 @@
 function codebook = codebook_generate(audio_file, num_mel_coeffs, ...
-                                      num_clusters, max_itr, epsilon)
+                                      num_clusters, epsilon, frame_size, ...
+                                      overlap_size, window)
 
-    window = hann(256, "periodic");
-    mfccs = get_mfccs(audio_file, num_mel_coeffs, 256, 85, window);
+    % Get the MFCCs to characterize the audio file
+    mfccs = get_mfccs(audio_file, num_mel_coeffs, frame_size, overlap_size, ...
+                        window);
     
-    % Assuming melcc contains cepstral coefficients
-    
-    % ------------------ BOILERPLATE LBG IMPLEMENTATION --------------------
-    
-    % Little has been modified / optimized here from online resources, has not
-    % been sufficiently tested (may need to be reimplemented).
-    
-    % Initialize codebook using random vectors from melcc
+    % Initialize the codebook with random MFCC vectors -
     codebook = mfccs(randperm(size(mfccs, 1), num_clusters), :);
 
-    codebook = zeros(size(codebook));
-    codebook = 
-
-    %disp(mfccs);
-
-    % Initialize the codebook by taking the mean mfcc vector
-    
-    % for i = 1:num_clusters
-    % 
-    % end
-    
-    for iter = 1:max_itr
+    for iter = 1:100
         % Vector quantization step: Assign each vector to the nearest centroid
+        % The "assignments" vector contains the index of the nearest
+        % existing centroid to every MFCC vector
         [~, assignments] = pdist2(codebook, mfccs, 'euclidean', 'Smallest', 1);
-        
+
         % Update centroids
         new_codebook = zeros(size(codebook));
         for i = 1:num_clusters
+            % cluster_indices is an array that contains all vectors that
+            % were assigned to the ith centroid - essentially all vectors
+            % that had the smallest Euclidean distance to the ith centroid
             cluster_indices = (assignments == i);
+
+            % If any of the cluster_indices are nonzero, update the
+            % codebook with the mean of all the vectors assigned to this
+            % cluster
             if any(cluster_indices)
                 new_codebook(i, :) = mean(mfccs(cluster_indices, :), 1);
             else
@@ -40,13 +33,110 @@ function codebook = codebook_generate(audio_file, num_mel_coeffs, ...
                 new_codebook(i, :) = codebook(i, :);
             end
         end
-        
+
         % Check for convergence
         if max(vecnorm(new_codebook - codebook, 2, 2)) < epsilon
             break;
         end
-        
+
         % Update codebook
         codebook = new_codebook;
     end
-end
+
+    % Assuming training_vectors is your input data matrix with Mel coefficients
+
+    % BAD ALG ------------------------------------------
+
+    % % Initialize codebook size based on the desired number of clusters and Mel coefficients
+    % num_mel_coefficients = size(mfccs, 2); % Number of Mel coefficients
+    % 
+    % codebook = zeros(num_clusters, num_mel_coefficients); % Initialize codebook
+    % 
+    % % Step 1: Initialize with a single-vector codebook (centroid of all training vectors)
+    % centroid = mean(mfccs, 1); % Calculate the centroid
+    % codebook(1, :) = centroid; % Initialize codebook with centroid
+    % 
+    % % Step 2: Double the size of the codebook
+    % while size(codebook, 1) < num_clusters
+    %     new_codebook = zeros(size(codebook, 1)*2, size(codebook, 2));
+    %     for i = 1:size(codebook, 1)
+    %         new_codebook(2*i-1, :) = codebook(i, :) * (1 + epsilon);
+    %         new_codebook(2*i, :) = codebook(i, :) * (1 - epsilon);
+    %     end
+    %     codebook = new_codebook;
+    % end
+    % 
+    % % Step 3: Nearest-Neighbor Search & Step 4: Centroid update
+    % average_distance = Inf;
+    % threshold = epsilon; % Preset threshold
+    % while average_distance > threshold
+    %     % Nearest-Neighbor Search
+    %     assigned_cells = zeros(size(mfccs, 1), 1);
+    %     for i = 1:size(mfccs, 1)
+    %         distances = sqrt(sum((codebook - mfccs(i, :)).^2, 2));
+    %         [~, assigned_cells(i)] = min(distances);
+    %     end
+    % 
+    %     % Centroid update
+    %     new_codebook = zeros(size(codebook));
+    %     for i = 1:num_clusters
+    %         indices = find(assigned_cells == i);
+    %         if ~isempty(indices)
+    %             new_codebook(i, :) = mean(mfccs(indices, :), 1);
+    %         else
+    %             % If no training vector assigned to this codeword, keep the previous codeword
+    %             new_codebook(i, :) = codebook(i, :);
+    %         end
+    %     end
+    % 
+    %     % Calculate average distance
+    %     distances = sqrt(sum((new_codebook - codebook).^2, 2));
+    %     average_distance = mean(distances);
+    % 
+    %     % Update codebook
+    %     codebook = new_codebook;
+    % end
+
+    % GOOD ALG
+
+    % Initialize with a single-vector codebook
+%     codebook = mean(mfccs, 1);
+% 
+%     for iter = 1:10
+%         % Double the size of the codebook
+%         new_codebook = zeros(num_clusters, size(mfccs, 2));
+%         for i = 1:size(codebook, 1)
+%             new_codebook(2*i-1, :) = codebook(i, :) * (1 + epsilon);
+%             new_codebook(2*i, :) = codebook(i, :) * (1 - epsilon);
+%         end
+%         codebook = new_codebook;
+% 
+%         % Nearest-Neighbor Search
+%         assignments = knnsearch(codebook, mfccs);
+% 
+%         % Centroid update
+%         for i = 1:num_clusters
+%             assigned_vectors = mfccs(assignments == i, :);
+%             if ~isempty(assigned_vectors)
+%                 codebook(i, :) = mean(assigned_vectors, 1);
+%             end
+%         end
+% 
+%         % Check convergence
+%         distortion = compute_distortion(mfccs, codebook, assignments);
+%         if distortion < epsilon
+%             break;
+%         end
+%     end
+% end
+% 
+% function distortion = compute_distortion(training_vectors, codebook, assignments)
+%     distortion = 0;
+%     for i = 1:size(codebook, 1)
+%         assigned_vectors = training_vectors(assignments == i, :);
+%         if ~isempty(assigned_vectors)
+%             distortion = distortion + sum(pdist2(assigned_vectors, codebook(i, :)));
+%         end
+%     end
+%     distortion = distortion / size(training_vectors, 1);
+% end

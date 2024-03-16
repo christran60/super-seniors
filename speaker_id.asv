@@ -70,9 +70,14 @@ for i = 1:num_speakers
         for j = 1:size(test_mfccs, 1)
             
             % Check the distance to all k centroids to find the smallest one
-            min_dist = Inf;
+            min_dist = 10^7;
 
             for k = 1:size(list_of_codebooks, 2)
+                
+                % Calculate the distance from jth MFCC to kth centroid
+                % dist = pdist2(test_mfccs(j, :), ...
+                %               list_of_codebooks(s, k, :), ...
+                %               'euclidean');
 
                 X = test_mfccs(j, :);
                 Y = squeeze(list_of_codebooks(s, k, :))';
